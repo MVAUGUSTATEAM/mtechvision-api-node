@@ -9,9 +9,10 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: mtechvision-api-node
-  ECS_CLUSTER: YOUR_ECS_CLUSTER_NAME
-  ECS_SERVICE: YOUR_ECS_SERVICE_NAME
-  ECS_TASK_FAMILY: YOUR_ECS_TASK_FAMILY_NAME
+  ECS_CLUSTER: mtechvision-ecs-main
+  ECS_SERVICE: mtechvision-api-svc-80
+  ECS_TASK_FAMILY: mtechvision-api-task
+
   APP_VERSION: "2.1.0" # TEMP: can later be read from tag (v2.1.1, etc.)
 
 jobs:
