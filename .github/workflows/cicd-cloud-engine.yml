@@ -1,0 +1,109 @@
+name: Cloud Engine CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - "v*.*.*"
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: mtechvision-api-node
+  ECS_CLUSTER: YOUR_ECS_CLUSTER_NAME
+  ECS_SERVICE: YOUR_ECS_SERVICE_NAME
+  ECS_TASK_FAMILY: YOUR_ECS_TASK_FAMILY_NAME
+  APP_VERSION: "2.1.0" # TEMP: can later be read from tag (v2.1.1, etc.)
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get AWS account ID
+        id: aws-account
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: image-tag
+        run: |
+          # Later we can derive from tag (v2.1.1). For now use APP_VERSION.
+          IMAGE_TAG=${APP_VERSION}
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        run: |
+          docker build -t $ECR_REPOSITORY:${{ steps.image-tag.outputs.IMAGE_TAG }} .
+
+      - name: Tag Docker image for ECR
+        run: |
+          ACCOUNT_ID=${{ steps.aws-account.outputs.ACCOUNT_ID }}
+          docker tag $ECR_REPOSITORY:${{ steps.image-tag.outputs.IMAGE_TAG }} \
+            $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPOSITORY:${{ steps.image-tag.outputs.IMAGE_TAG }}
+
+      - name: Push image to ECR
+        run: |
+          ACCOUNT_ID=${{ steps.aws-account.outputs.ACCOUNT_ID }}
+          docker push $ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPOSITORY:${{ steps.image-tag.outputs.IMAGE_TAG }}
+
+      - name: Prepare new task definition JSON
+        id: task-def
+        run: |
+          ACCOUNT_ID=${{ steps.aws-account.outputs.ACCOUNT_ID }}
+          IMAGE="$ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPOSITORY:${{ steps.image-tag.outputs.IMAGE_TAG }}"
+
+          aws ecs describe-task-definition \
+            --task-definition $ECS_TASK_FAMILY \
+            --query taskDefinition > task-def.json
+
+          # Clean fields AWS won't accept on register
+          jq 'del(.taskDefinitionArn,
+                  .requiresAttributes,
+                  .compatibilities,
+                  .revision,
+                  .status,
+                  .registeredAt,
+                  .registeredBy)' task-def.json > task-def-clean.json
+
+          # Update container image
+          jq --arg IMAGE "$IMAGE" '
+            .containerDefinitions[0].image = $IMAGE
+          ' task-def-clean.json > task-def-updated.json
+
+          echo "TASK_DEF_FILE=task-def-updated.json" >> $GITHUB_OUTPUT
+
+      - name: Register new task definition
+        id: register-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://${{ steps.task-def.outputs.TASK_DEF_FILE }} \
+            --query taskDefinition.taskDefinitionArn \
+            --output text)
+
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy ECS service
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --task-definition ${{ steps.register-task-def.outputs.TASK_DEF_ARN }}
+
+      - name: Verify Cloud Engine
+        run: |
+          ACCOUNT_ID=${{ steps.aws-account.outputs.ACCOUNT_ID }}
+          echo "Deployment done. You should verify https://api.mtechvision.com/health and /version now."

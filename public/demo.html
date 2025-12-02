@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>mtechvision-api Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1120;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #111827;
+      padding: 2rem 2.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      max-width: 480px;
+      width: 100%;
+    }
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.5rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: #047857;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 1rem;
+    }
+    pre {
+      background: #020617;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.8rem;
+      overflow-x: auto;
+    }
+    .meta {
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">mtechvision-api</div>
+    <h1>API is online ✅</h1>
+    <p>This page is served by the Node.js service behind ALB &amp; ECS Fargate.</p>
+    <p><strong>Live health check:</strong></p>
+    <pre id="health">Loading...</pre>
+    <div class="meta">
+      <div id="version"></div>
+      <div id="timestamp"></div>
+    </div>
+  </div>
+
+  <script>
+    async function loadHealth() {
+      try {
+        const res = await fetch("/health");
+        const json = await res.json();
+
+        document.getElementById("health").textContent =
+          JSON.stringify(json, null, 2);
+
+        document.getElementById("version").textContent =
+          "Version: " + (json.version || "unknown");
+
+        document.getElementById("timestamp").textContent =
+          "Last update: " + new Date().toLocaleString();
+      } catch (err) {
+        document.getElementById("health").textContent =
+          "Error fetching /health: " + err.message;
+      }
+    }
+
+    loadHealth();
+    setInterval(loadHealth, 5000);
+  </script>
+</body>
+</html>
