@@ -116,6 +116,7 @@ app.get("/mugello/os-status", (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+console.log("mtechvision-api starting with API_VERSION =", API_VERSION);
 
 app.listen(PORT, () => {
   console.log(`mtechvision-api listening on port ${PORT}`);
