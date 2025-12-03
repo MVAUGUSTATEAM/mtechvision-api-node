@@ -15,7 +15,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use('/', modulesRouter());
 
 const PORT = process.env.PORT || 3000;
-const API_VERSION = process.env.API_VERSION || "2.1.0";
+const API_VERSION = process.env.API_VERSION || "2.1.1";
 
 // ---- CORS (frontend allowed origins) ----
 const allowedOrigins = [

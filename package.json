@@ -1,6 +1,6 @@
 {
   "name": "mtechvision-api",
-  "version": "1.0.0",
+  "version": "2.1.1",
   "description": "Mtechvision API - first Node.js service behind ALB/ECS",
   "main": "index.js",
   "scripts": {
